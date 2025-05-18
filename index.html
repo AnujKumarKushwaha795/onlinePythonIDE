@@ -466,6 +466,46 @@
                 font-size: 12px;
                 padding: 6px 12px;
             }
+            .ai-modal-content {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                top: 0;
+                max-height: 100vh;
+                border-radius: 0;
+                margin: 0;
+                padding: 16px 0 80px 0; /* Added bottom padding for input area */
+            }
+            .ai-chat-area {
+                height: calc(100vh - 180px); /* Adjust height to account for header and input */
+                margin-bottom: 0;
+            }
+            #aiModal {
+                padding: 0;
+            }
+            #aiModal .ai-modal-content > div:first-child {
+                position: sticky;
+                top: 0;
+                background: var(--panel-bg,#23272e);
+                z-index: 1;
+                padding: 12px 16px;
+                margin-bottom: 8px;
+            }
+            #aiModal .ai-modal-content > div:last-child {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: var(--panel-bg,#23272e);
+                padding: 12px 16px;
+                border-top: 1px solid #333;
+                z-index: 1;
+            }
+            #aiInput {
+                max-height: 100px;
+                min-height: 40px;
+            }
         }
         /* Add styles for larger screens */
         @media screen and (min-width: 769px) {
