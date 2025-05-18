@@ -71,5 +71,3 @@ A modern, feature-rich web-based Python IDE with real-time code execution and AI
 - Server must be running for code execution
 
 ## License
-
-MIT License 
