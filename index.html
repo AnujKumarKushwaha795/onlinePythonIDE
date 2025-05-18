@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Online IDE</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+    <!-- Monaco Editor -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #1e1e1e;
+            --text-color: #ffffff;
+            --panel-bg: #23272e;
+            --editor-bg: #1e1e1e;
+            --terminal-bg: #000000;
+        }
+        body.light-theme {
+            --bg-color: #f5f5f5;
+            --text-color: #222;
+            --panel-bg: #fff;
+            --editor-bg: #fff;
+            --terminal-bg: #f5f5f5;
+        }
+        html, body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+        body {
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            width: 100vw;
+            min-height: 100vh;
+            min-width: 100vw;
+            display: flex;
+            flex-direction: column;
+        }
+        .container {
+            width: 100vw;
+            height: 100vh;
+            margin: 0;
+            padding-left: 24px;
+            padding-right: 24px;
+            box-sizing: border-box;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-top: 10px;
+            padding-left: 8px;
+            padding-right: 8px;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .theme-toggle {
+            background: var(--panel-bg);
+            color: var(--text-color);
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 6px 14px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .theme-toggle:hover {
+            background: #007acc;
+            color: #fff;
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+        .connected {
+            background-color: #2e7d32;
+        }
+        .disconnected {
+            background-color: #c62828;
+        }
+        .connecting {
+            background-color: #ef6c00;
+        }
+        .main-content {
+            display: flex;
+            flex: 1;
+            gap: 0;
+            min-height: 0;
+        }
+        .resizer {
+            width: 5px;
+            background: #333;
+            cursor: col-resize;
+            height: 100%;
+            z-index: 10;
+        }
+        .resizer:hover {
+            background: #007acc;
+        }
+        .editor-container {
+            display: flex;
+            flex-direction: column;
+            width: 50%;
+            min-width: 200px;
+            flex-grow: 1;
+            flex-shrink: 1;
+            position: relative;
+        }
+        .vertical-resizer {
+            height: 6px;
+            background: #333;
+            cursor: row-resize;
+            width: 100%;
+            z-index: 10;
+            transition: background 0.2s;
+        }
+        .vertical-resizer:hover {
+            background: #007acc;
+        }
+        #editor {
+            flex: 1 1 auto;
+            border: 1px solid #333;
+            border-radius: 5px;
+            min-height: 200px;
+            background: #1e1e1e;
+            min-height: 60px;
+        }
+        .test-area {
+            margin-top: 10px;
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 5px;
+            padding: 10px;
+            font-family: 'Consolas', monospace;
+            font-size: 14px;
+            color: #d4d4d4;
+            height: 200px;
+            overflow-y: auto;
+            resize: vertical;
+            min-height: 60px;
+        }
+        .test-area .prompt {
+            color: #569cd6;
+        }
+        .test-area .input {
+            color: #ce9178;
+        }
+        .test-area .output {
+            color: #6a9955;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+        .input-modal {
+            position: fixed;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 8px;
+            z-index: 1000;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            min-width: 300px;
+            border: 1px solid #333;
+        }
+        .input-modal .prompt {
+            color: #569cd6;
+            margin-bottom: 10px;
+            font-size: 14px;
+            font-family: 'Consolas', monospace;
+        }
+        .input-modal input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            background: #252526;
+            border: 1px solid #3c3c3c;
+            color: #d4d4d4;
+            border-radius: 4px;
+            font-family: 'Consolas', monospace;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .input-modal input:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+        .input-modal button {
+            padding: 8px 16px;
+            background: #007acc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            float: right;
+        }
+        .input-modal button:hover {
+            background: #1a8ad2;
+        }
+        .input-bar {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            background: #23272e;
+            border: 1px solid #333;
+            border-radius: 5px 5px 0 0;
+            padding: 12px 16px;
+            font-family: 'Consolas', monospace;
+            font-size: 15px;
+            color: #569cd6;
+            margin-bottom: -2px;
+            margin-top: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .input-bar input {
+            flex: 1;
+            padding: 8px;
+            background: #252526;
+            border: 1px solid #3c3c3c;
+            color: #d4d4d4;
+            border-radius: 4px;
+            font-family: 'Consolas', monospace;
+            font-size: 15px;
+            box-sizing: border-box;
+        }
+        .input-bar input:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+        .input-bar button {
+            padding: 8px 16px;
+            background: #007acc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 15px;
+        }
+        .input-bar button:hover {
+            background: #1a8ad2;
+        }
+        .terminal-container {
+            display: flex;
+            flex-direction: column;
+            width: 50%;
+            min-width: 200px;
+            flex-grow: 1;
+            flex-shrink: 1;
+        }
+        #terminal {
+            flex: 1 1 auto;
+            background-color: #000000;
+            border-radius: 5px;
+            overflow: hidden;
+            min-height: 200px;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 3px;
+            background-color: #2196f3;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #1976d2;
+        }
+        button:disabled {
+            background-color: #666666;
+            cursor: not-allowed;
+        }
+        .error-message {
+            color: #ff5252;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: rgba(255, 82, 82, 0.1);
+            border-radius: 3px;
+            display: none;
+        }
+        .editor-toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .run-button {
+            background-color: #4caf50;
+        }
+        .run-button:hover {
+            background-color: #388e3c;
+        }
+        .ai-chat-msg {
+            margin-bottom: 20px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            max-width: 80%;
+            word-break: break-word;
+            white-space: pre-line;
+            font-size: 15px;
+            line-height: 1.5;
+            display: flex;
+            flex-direction: column;
+        }
+        .ai-chat-user {
+            background: #007acc;
+            color: #fff;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+            margin-right: 10px;
+        }
+        .ai-chat-ai {
+            background: #23272e;
+            color: #d4d4d4;
+            align-self: center;
+            border-bottom-left-radius: 4px;
+            border: 1px solid #333;
+            margin-left: 10px;
+        }
+        .ai-chat-area {
+            height: 600px;
+            overflow-y: auto;
+            background: #181a1b;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            font-family: Consolas, monospace;
+            font-size: 15px;
+            scrollbar-width: thin;
+            scrollbar-color: #444 #23272e;
+        }
+        .ai-chat-msg pre {
+            background: #1e1e1e;
+            color: #fff;
+            padding: 14px 38px 14px 18px;
+            border-radius: 8px;
+            margin: 16px 0 0 0;
+            font-size: 15px;
+            font-family: 'Consolas', monospace;
+            overflow-x: auto;
+            position: relative;
+        }
+        .ai-copy-btn {
+            position: absolute;
+            right: 8px;
+            top: 8px;
+            background: #23272e;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 13px;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        .ai-copy-btn:hover {
+            opacity: 1;
+            background: #007acc;
+        }
+        .ai-chat-msg code {
+            background: #23272e;
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Consolas', monospace;
+        }
+        .ai-loading {
+            color: #aaa;
+            font-style: italic;
+            text-align: center;
+            margin: 10px 0;
+        }
+        /* Center the AI chat modal and content */
+        #aiModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.4);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        .ai-modal-content {
+            background: var(--panel-bg,#23272e);
+            color: var(--text-color,#fff);
+            padding: 24px 0 16px 0;
+            border-radius: 8px;
+            min-width: 350px;
+            max-width: 900px;
+            width: 100%;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px #0008;
+            margin: 0 auto;
+        }
+        .ai-chat-area {
+            height: 800px;
+            overflow-y: auto;
+            background: #181a1b;
+            border-radius: 5px;
+            padding: 10px 0;
+            margin-bottom: 10px;
+            font-family: Consolas, monospace;
+            font-size: 15px;
+            scrollbar-width: thin;
+            scrollbar-color: #444 #23272e;
+            width: 100%;
+        }
+        .ai-chat-msg {
+            margin-left: 15px;
+            margin-right: 15px;
+            max-width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <h1>Python IDE Made by Anuj</h1>
+                <button class="theme-toggle" id="themeToggle">🌙 Dark</button>
+            </div>
+            <button id="aiButton" class="status connected" style="cursor:pointer;">🤖 AI</button>
+        </div>
+        <div class="main-content">
+            <div class="editor-container">
+                <div class="editor-toolbar">
+                    <button onclick="runCode()" id="runButton" class="run-button">Run Code</button>
+                    <button onclick="clearEditor()" id="clearButton">Clear Editor</button>
+                    <button onclick="saveCode()" id="saveButton">💾 Save</button>
+                    <button onclick="loadCode()" id="loadButton">📂 Load</button>
+                </div>
+                <div id="editor"></div>
+                <div class="vertical-resizer" id="verticalResizer"></div>
+                <div class="input-bar" id="inputBar">
+                    <span id="inputPrompt" class="prompt"></span>
+                    <input type="text" id="inputBox" autocomplete="off" />
+                    <button id="inputOkBtn">OK</button>
+                </div>
+                <div class="test-area" id="testArea"></div>
+                <div style="color:#aaa; font-size:13px; margin-top:2px;">
+                    <b>Note:</b> Input values will be shown in the test area above. Each input prompt will appear in a popup.
+                </div>
+            </div>
+            <div class="resizer" id="resizer"></div>
+            <div class="terminal-container">
+                <div id="terminal"></div>
+            </div>
+        </div>
+        <div id="errorMessage" class="error-message"></div>
+    </div>
+
+    <!-- AI Chat Modal -->
+    <div id="aiModal">
+        <div class="ai-modal-content">
+            <div style="font-size:20px;font-weight:bold;margin-bottom:10px;padding-left:24px;padding-right:24px;">💬 Chat with AI <button id="closeAiModal" style="float:right;background:none;border:none;font-size:20px;color:#aaa;cursor:pointer;">&times;</button></div>
+            <div id="aiChatArea" class="ai-chat-area"></div>
+            <div style="display:flex;gap:8px;padding-left:24px;padding-right:24px;">
+                <textarea id="aiInput" rows="2" style="flex:1;resize:none;padding:8px;font-size:15px;border-radius:4px;border:1px solid #333;background:#23272e;color:var(--text-color,#fff);"></textarea>
+                <button id="aiSend" style="padding:8px 18px;background:#007acc;color:#fff;border:none;border-radius:4px;font-size:15px;cursor:pointer;">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let term = null;
+        let editor = null;
+        const errorMessage = document.getElementById('errorMessage');
+        
+        // Initialize Monaco Editor
+        require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' }});
+        require(['vs/editor/editor.main'], function() {
+            editor = monaco.editor.create(document.getElementById('editor'), {
+                value: '# Write your Python code here\nprint("Hello, World!")',
+                language: 'python',
+                theme: 'vs-dark',
+                automaticLayout: true,
+                minimap: { enabled: false },
+                fontSize: 14,
+                lineNumbers: 'on',
+                roundedSelection: false,
+                scrollBeyondLastLine: false,
+                readOnly: false,
+                cursorStyle: 'line',
+                tabSize: 4,
+                insertSpaces: true
+            });
+        });
+
+        function initializeTerminal() {
+            if (term) {
+                term.dispose();
+            }
+
+            term = new Terminal({
+                cursorBlink: true,
+                fontSize: 14,
+                fontFamily: 'Consolas, monospace',
+                theme: {
+                    background: '#000000',
+                    foreground: '#ffffff'
+                }
+            });
+
+            const fitAddon = new FitAddon.FitAddon();
+            term.loadAddon(fitAddon);
+            
+            term.open(document.getElementById('terminal'));
+            fitAddon.fit();
+
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                fitAddon.fit();
+                if (editor) {
+                    editor.layout();
+                }
+            });
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            if (message === 'Code saved!' || message === 'Code loaded!') {
+                errorMessage.style.color = '#4caf50'; // green
+            } else {
+                errorMessage.style.color = '#ff5252'; // red
+            }
+            errorMessage.style.display = 'block';
+            setTimeout(() => {
+                errorMessage.style.display = 'none';
+            }, 3000);
+        }
+
+        function writeToTerminal(text, color=null) {
+            // Normalize newlines for xterm.js
+            if (color) {
+                text = `\x1b[${color}m` + text + '\x1b[0m';
+            }
+            // Replace \n with \r\n for proper line breaks in xterm.js
+            term.write(text.replace(/\n/g, '\r\n'));
+        }
+
+        function extractInputPrompts(code) {
+            // Simple regex to find input("prompt") in code
+            const regex = /input\s*\(\s*["']([^\"']*)["']\s*\)/g;
+            let match, prompts = [];
+            while ((match = regex.exec(code)) !== null) {
+                prompts.push(match[1]);
+            }
+            return prompts;
+        }
+
+        async function getUserInputs(prompts) {
+            let inputs = [];
+            const testArea = document.getElementById('testArea');
+            testArea.innerHTML = '';
+            const inputBar = document.getElementById('inputBar');
+            const inputPrompt = document.getElementById('inputPrompt');
+            const inputBox = document.getElementById('inputBox');
+            const inputOkBtn = document.getElementById('inputOkBtn');
+            inputBar.style.display = 'flex';
+
+            for (let prompt of prompts) {
+                let value = await new Promise(resolve => {
+                    inputPrompt.textContent = prompt;
+                    inputBox.value = '';
+                    inputBox.focus();
+                    const onOk = () => {
+                        inputBox.removeEventListener('keypress', onEnter);
+                        inputOkBtn.removeEventListener('click', onOk);
+                        resolve(inputBox.value);
+                    };
+                    const onEnter = (e) => {
+                        if (e.key === 'Enter') {
+                            onOk();
+                        }
+                    };
+                    inputBox.addEventListener('keypress', onEnter);
+                    inputOkBtn.addEventListener('click', onOk);
+                });
+                // Add to test area
+                const promptDiv = document.createElement('div');
+                promptDiv.innerHTML = `<span class="prompt">${prompt}</span>`;
+                testArea.appendChild(promptDiv);
+                const inputDiv = document.createElement('div');
+                inputDiv.innerHTML = `<span class="input">${value}</span>`;
+                testArea.appendChild(inputDiv);
+                inputs.push(value);
+            }
+            inputBar.style.display = 'none';
+            return inputs;
+        }
+
+        async function runCode() {
+            const code = editor.getValue();
+            const prompts = extractInputPrompts(code);
+            let userInput = '';
+            
+            if (prompts.length > 0) {
+                const inputs = await getUserInputs(prompts);
+                userInput = inputs.join('\n');
+            }
+            
+            // Clear terminal and test area on every run
+            term.clear();
+            const testArea = document.getElementById('testArea');
+            testArea.innerHTML = '';
+            writeToTerminal('Running code...\n', '32');
+            fetch('https://pythonide-2dff.onrender.com/api/execute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: code, input: userInput })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.output) {
+                    writeToTerminal(data.output);
+
+                    // Build test area output: show each prompt and user input, then the rest of the output
+                    const testArea = document.getElementById('testArea');
+                    let html = '';
+                    const userInputsArr = (userInput || '').split('\n');
+                    for (let i = 0; i < prompts.length; ++i) {
+                        html += `<span class="output">${prompts[i]}</span> <span class="input" style="color:#ce9178;">${userInputsArr[i] || ''}</span><br>`;
+                    }
+                    // Show the rest of the output (excluding prompts)
+                    // Remove lines that match any prompt
+                    const outputLines = (data.output || '').split('\n');
+                    for (let line of outputLines) {
+                        // Only add lines that are not prompts
+                        if (!prompts.some(p => line.trim().startsWith(p.trim()))) {
+                            html += `<span class="output">${line.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span><br>`;
+                        }
+                    }
+                    const outputDiv = document.createElement('div');
+                    outputDiv.innerHTML = html;
+                    testArea.appendChild(outputDiv);
+                }
+                if (data.error) {
+                    writeToTerminal(data.error, '31');
+                    // Add error to test area
+                    const testArea = document.getElementById('testArea');
+                    const errorDiv = document.createElement('div');
+                    errorDiv.innerHTML = `<span style="color: #f14c4c;">${(data.error || '').replace(/\n/g, '<br>')}</span>`;
+                    testArea.appendChild(errorDiv);
+                }
+            })
+            .catch(err => {
+                writeToTerminal('Error: ' + err, '31');
+                // Add error to test area
+                const testArea = document.getElementById('testArea');
+                const errorDiv = document.createElement('div');
+                errorDiv.innerHTML = `<span style="color: #f14c4c;">Error: ${(err || '').replace(/\n/g, '<br>')}</span>`;
+                testArea.appendChild(errorDiv);
+            });
+        }
+
+        function clearEditor() {
+            if (editor) {
+                editor.setValue('');
+            }
+            // Also clear terminal and test area
+            if (term) {
+                term.clear();
+            }
+            const testArea = document.getElementById('testArea');
+            if (testArea) {
+                testArea.innerHTML = '';
+            }
+        }
+
+        // Initialize terminal on page load!
+        initializeTerminal();
+
+        // Add resizer functionality
+        const resizer = document.getElementById('resizer');
+        const editorContainer = document.querySelector('.editor-container');
+        const terminalContainer = document.querySelector('.terminal-container');
+        const verticalResizer = document.getElementById('verticalResizer');
+        const editorDiv = document.getElementById('editor');
+        const testAreaDiv = document.getElementById('testArea');
+        let isResizing = false;
+        let isVertResizing = false;
+
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            document.body.style.cursor = 'col-resize';
+            document.addEventListener('mousemove', handleHorizontalResize);
+            document.addEventListener('mouseup', stopHorizontalResize);
+        });
+
+        function handleHorizontalResize(e) {
+            if (!isResizing) return;
+            const mainContent = document.querySelector('.main-content');
+            const offsetLeft = mainContent.getBoundingClientRect().left;
+            const totalWidth = mainContent.offsetWidth;
+            let newEditorWidth = e.clientX - offsetLeft;
+            let minWidth = 200;
+            let maxWidth = totalWidth - minWidth;
+            if (newEditorWidth < minWidth) newEditorWidth = minWidth;
+            if (newEditorWidth > maxWidth) newEditorWidth = maxWidth;
+            editorContainer.style.width = newEditorWidth + 'px';
+            terminalContainer.style.width = (totalWidth - newEditorWidth - resizer.offsetWidth) + 'px';
+            if (editor) editor.layout();
+            if (term && term.fit) term.fit();
+        }
+
+        function stopHorizontalResize() {
+            isResizing = false;
+            document.body.style.cursor = '';
+            document.removeEventListener('mousemove', handleHorizontalResize);
+            document.removeEventListener('mouseup', stopHorizontalResize);
+        }
+
+        // Vertical resizer for editor/output
+        verticalResizer.addEventListener('mousedown', (e) => {
+            isVertResizing = true;
+            document.body.style.cursor = 'row-resize';
+            document.addEventListener('mousemove', handleVerticalResize);
+            document.addEventListener('mouseup', stopVerticalResize);
+        });
+
+        function handleVerticalResize(e) {
+            if (!isVertResizing) return;
+            const containerRect = editorContainer.getBoundingClientRect();
+            const minEditorHeight = 60;
+            const minTestAreaHeight = 60;
+            let newEditorHeight = e.clientY - containerRect.top;
+            let totalHeight = editorContainer.offsetHeight;
+            if (newEditorHeight < minEditorHeight) newEditorHeight = minEditorHeight;
+            if (newEditorHeight > totalHeight - minTestAreaHeight - verticalResizer.offsetHeight) newEditorHeight = totalHeight - minTestAreaHeight - verticalResizer.offsetHeight;
+            editorDiv.style.height = newEditorHeight + 'px';
+            testAreaDiv.style.height = (totalHeight - newEditorHeight - verticalResizer.offsetHeight - 10) + 'px';
+            if (editor) editor.layout();
+        }
+
+        function stopVerticalResize() {
+            isVertResizing = false;
+            document.body.style.cursor = '';
+            document.removeEventListener('mousemove', handleVerticalResize);
+            document.removeEventListener('mouseup', stopVerticalResize);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (term) term.fit();
+            if (editor) editor.layout();
+        });
+
+        // THEME SWITCHER
+        const themeToggle = document.getElementById('themeToggle');
+        let isDark = true;
+        themeToggle.onclick = function() {
+            isDark = !isDark;
+            if (isDark) {
+                document.body.classList.remove('light-theme');
+                themeToggle.textContent = '🌙 Dark';
+                if (editor) monaco.editor.setTheme('vs-dark');
+            } else {
+                document.body.classList.add('light-theme');
+                themeToggle.textContent = '☀️ Light';
+                if (editor) monaco.editor.setTheme('vs');
+            }
+        };
+
+        // SAVE/LOAD CODE
+        function saveCode() {
+            if (editor) {
+                localStorage.setItem('anuj_ide_code', editor.getValue());
+                showError('Code saved!');
+            }
+        }
+        function loadCode() {
+            const code = localStorage.getItem('anuj_ide_code');
+            if (editor && code !== null) {
+                editor.setValue(code);
+                showError('Code loaded!');
+            } else {
+                showError('No saved code found.');
+            }
+        }
+
+        // KEYBOARD SHORTCUTS
+        document.addEventListener('keydown', function(e) {
+            // Run code: Ctrl+Enter
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                runCode();
+            }
+            // Clear editor: Ctrl+L
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'l' || e.key === 'L')) {
+                e.preventDefault();
+                clearEditor();
+            }
+            // Save: Ctrl+S
+            if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+                e.preventDefault();
+                saveCode();
+            }
+            // Load: Ctrl+O
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'o' || e.key === 'O')) {
+                e.preventDefault();
+                loadCode();
+            }
+        });
+
+        // AI Chat Modal logic
+        const aiButton = document.getElementById('aiButton');
+        const aiModal = document.getElementById('aiModal');
+        const closeAiModal = document.getElementById('closeAiModal');
+        const aiSend = document.getElementById('aiSend');
+        const aiInput = document.getElementById('aiInput');
+        const aiChatArea = document.getElementById('aiChatArea');
+
+        aiButton.onclick = () => {
+            aiModal.style.display = 'flex';
+        };
+        closeAiModal.onclick = () => {
+            aiModal.style.display = 'none';
+        };
+        aiSend.onclick = sendAiMessage;
+        aiInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendAiMessage();
+            }
+        });
+
+        function appendAiMessage(sender, text) {
+            const msgDiv = document.createElement('div');
+            msgDiv.classList.add('ai-chat-msg');
+            if (sender === 'You') {
+                msgDiv.classList.add('ai-chat-user');
+                msgDiv.innerText = text;
+            } else {
+                msgDiv.classList.add('ai-chat-ai');
+                msgDiv.innerHTML = renderChatGptStyle(text);
+            }
+            aiChatArea.appendChild(msgDiv);
+            aiChatArea.scrollTop = aiChatArea.scrollHeight;
+        }
+
+        function showAiLoading() {
+            let loadingDiv = document.createElement('div');
+            loadingDiv.className = 'ai-loading';
+            loadingDiv.id = 'aiLoadingMsg';
+            loadingDiv.innerHTML = '<span>AI is typing<span class="ai-dot">.</span><span class="ai-dot">.</span><span class="ai-dot">.</span></span>';
+            aiChatArea.appendChild(loadingDiv);
+            aiChatArea.scrollTop = aiChatArea.scrollHeight;
+        }
+        function removeAiLoading() {
+            const loadingDiv = document.getElementById('aiLoadingMsg');
+            if (loadingDiv) loadingDiv.remove();
+        }
+
+        function sendAiMessage() {
+            const msg = aiInput.value.trim();
+            if (!msg) return;
+            appendAiMessage('You', msg);
+            aiInput.value = '';
+            showAiLoading();
+            fetch('https://pythonide-2dff.onrender.com/api/ai_chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: msg })
+            })
+            .then(async res => {
+                let data;
+                try {
+                    data = await res.json();
+                } catch (e) {
+                    data = { error: 'Invalid response from server.' };
+                }
+                removeAiLoading();
+                appendAiMessage('AI', data.reply || data.error || 'No response');
+            })
+            .catch(err => {
+                removeAiLoading();
+                appendAiMessage('AI', 'Error: ' + err);
+            });
+        }
+
+        // Improved Markdown-like renderer for ChatGPT style
+        function renderChatGptStyle(text) {
+            if (!text) return '';
+            // Remove Markdown symbols for headings, lists, bold, italics
+            text = text.replace(/^#+\s?/gm, ''); // Remove headings
+            text = text.replace(/^\s*\*\s?/gm, ''); // Remove bullet points
+            text = text.replace(/\*\*([^*]+)\*\*/g, '$1'); // Remove bold
+            text = text.replace(/\*([^*]+)\*/g, '$1'); // Remove italics
+            // Code blocks with copy button
+            text = text.replace(/```([\s\S]*?)```/g, function(match, code) {
+                const codeHtml = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const id = 'code-' + Math.random().toString(36).substr(2, 9);
+                setTimeout(() => {
+                    const btn = document.getElementById(id);
+                    if (btn) {
+                        btn.onclick = function() {
+                            navigator.clipboard.writeText(code);
+                            btn.textContent = 'Copied!';
+                            setTimeout(() => btn.textContent = 'Copy', 1200);
+                        };
+                    }
+                }, 0);
+                return `<pre><button class="ai-copy-btn" id="${id}">Copy</button>${codeHtml}</pre>`;
+            });
+            // Inline code
+            text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+            // Line breaks
+            text = text.replace(/\n/g, '<br>');
+            return text;
+        }
+    </script>
+</body>
+</html> 
